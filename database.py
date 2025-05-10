@@ -1,13 +1,18 @@
 import psycopg2
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
-# Configuración de la conexión (deberás completar estos datos)
+# Cargar variables de entorno
+load_dotenv()
+
+# Configuración de la conexión desde variables de entorno
 DB_CONFIG = {
-    'dbname': '',
-    'user': '',
-    'password': '',
-    'host': '',
-    'port': ''
+    'dbname': os.getenv('DB_NAME'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'host': os.getenv('DB_HOST'),
+    'port': os.getenv('DB_PORT')
 }
 
 def conectar_db():
@@ -28,7 +33,7 @@ def obtener_datos_lote(nro_lote):
         # Ajusta esta consulta según tu esquema de base de datos
         query = """
             SELECT cod_articulo, fecha_vencimiento 
-            FROM lotes 
+            FROM v_cz_articulolote 
             WHERE nro_lote = %s
         """
         cursor.execute(query, (nro_lote,))
