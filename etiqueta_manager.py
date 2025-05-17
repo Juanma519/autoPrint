@@ -2,41 +2,77 @@ import os
 import shutil
 from datetime import datetime
 from pptx import Presentation
+from dotenv import load_dotenv
 
-# Configurar rutas (ajustar según tu estructura de carpetas)
-CARPETA_ETIQUETAS = "etiquetas"
-CARPETA_TEMP = "temp"
+load_dotenv()
 
-def crear_carpetas():
-    """Crea las carpetas necesarias si no existen"""
-    for carpeta in [CARPETA_ETIQUETAS, CARPETA_TEMP]:
-        if not os.path.exists(carpeta):
-            os.makedirs(carpeta)
 
+CARPETA_ORIGEN = os.getenv('CARPETA_INICIAL')
+CARPETA_DESTINO = os.getenv('CARPETA_FINAL')
 def buscar_etiqueta(cod_articulo):
     """Busca el archivo de etiqueta correspondiente al código de artículo"""
-    for archivo in os.listdir(CARPETA_ETIQUETAS):
-        if archivo.startswith(f"{cod_articulo}_") and archivo.endswith(".pptx"):
-            return os.path.join(CARPETA_ETIQUETAS, archivo)
-    return None
+    archivo_original = os.path.join(CARPETA_ORIGEN, f"{cod_articulo}.pptx")
+    print(archivo_original)
+    if os.path.exists(archivo_original):
+        return archivo_original
+    raise Exception(f"No se encontró el archivo {archivo_original}")
 
 def modificar_etiqueta(archivo, nro_lote, fecha_vencimiento):
     """Modifica el contenido de la etiqueta"""
     try:
+        # Verificar que el archivo existe
+        if not os.path.exists(archivo):
+            raise Exception(f"El archivo {archivo} no existe")
+
         prs = Presentation(archivo)
         
-        # Formatear fecha de vencimiento
-        fecha_formateada = fecha_vencimiento.strftime("%d/%m/%Y")
-
         # Buscar y reemplazar los textos en todas las diapositivas
         for slide in prs.slides:
+            # Buscar en todas las formas
             for shape in slide.shapes:
+                # Buscar en el texto de la forma
                 if hasattr(shape, "text"):
-                    # Reemplazar marcadores de posición
-                    shape.text = shape.text.replace("*fecha vencimiento", fecha_formateada)
-                    shape.text = shape.text.replace("*nro de lote", str(nro_lote))
+                    texto = shape.text.strip()
+                    print(f"Texto encontrado en shape: '{texto}'")
+                    if "XXXXXXX" in texto:
+                        # Preservar el formato del texto original
+                        if hasattr(shape, "text_frame"):
+                            for paragraph in shape.text_frame.paragraphs:
+                                for run in paragraph.runs:
+                                    if "XXXXXXX" in run.text:
+                                        run.text = run.text.replace("XXXXXXX", str(nro_lote))
 
-        # Guardar los cambios
+                    if "XX-XX-XXXX" in texto:
+                        # Preservar el formato del texto original
+                        if hasattr(shape, "text_frame"):
+                            for paragraph in shape.text_frame.paragraphs:
+                                for run in paragraph.runs:
+                                    if "XX-XX-XXXX" in run.text:
+                                        run.text = run.text.replace("XX-XX-XXXX", fecha_vencimiento)
+                
+            
+                
+                # Buscar en grupos de formas
+                if shape.shape_type == 6:  
+                    for sub_shape in shape.shapes:
+                        if hasattr(sub_shape, "text"):
+                            texto = sub_shape.text.strip()
+                            if "XXXXXXX" in texto:
+                                # Preservar el formato del texto en el grupo
+                                if hasattr(sub_shape, "text_frame"):
+                                    for paragraph in sub_shape.text_frame.paragraphs:
+                                        for run in paragraph.runs:
+                                            if "XXXXXXX" in run.text:
+                                                run.text = run.text.replace("XXXXXXX", str(nro_lote))
+                            if "XX-XX-XXXX" in texto:
+                                # Preservar el formato del texto en el grupo
+                                if hasattr(sub_shape, "text_frame"):
+                                    for paragraph in sub_shape.text_frame.paragraphs:
+                                        for run in paragraph.runs:
+                                            if "XX-XX-XXXX" in run.text:
+                                                run.text = run.text.replace("XX-XX-XXXX", fecha_vencimiento)
+
+        
         prs.save(archivo)
 
     except Exception as e:
@@ -45,25 +81,22 @@ def modificar_etiqueta(archivo, nro_lote, fecha_vencimiento):
 def procesar_etiqueta(cod_articulo, nro_lote, fecha_vencimiento):
     """Procesa la etiqueta para su impresión"""
     try:
-        # Crear carpetas si no existen
-        crear_carpetas()
-        
         # Buscar el archivo de etiqueta original
         archivo_original = buscar_etiqueta(cod_articulo)
-        if not archivo_original:
-            raise Exception(f"No se encontró la etiqueta para el artículo {cod_articulo}")
+        
+        # Construir la ruta del archivo de destino
+        archivo_destino = os.path.join(CARPETA_DESTINO, f"{cod_articulo}.pptx")
 
-        # Crear nombre para el archivo temporal
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        archivo_temp = os.path.join(CARPETA_TEMP, f"etiqueta_{timestamp}.pptx")
+        # Asegurarse de que la carpeta de destino existe
+        os.makedirs(CARPETA_DESTINO, exist_ok=True)
 
-        # Copiar el archivo original
-        shutil.copy2(archivo_original, archivo_temp)
+        # Copiar el archivo original a la carpeta de destino
+        shutil.copy2(archivo_original, archivo_destino)
 
-        # Modificar el archivo
-        modificar_etiqueta(archivo_temp, nro_lote, fecha_vencimiento)
+        # Modificar el archivo en la carpeta de destino
+        modificar_etiqueta(archivo_destino, nro_lote, fecha_vencimiento)
 
-        return archivo_temp
+        return archivo_destino
 
     except Exception as e:
         raise Exception(f"Error al procesar la etiqueta: {str(e)}") 

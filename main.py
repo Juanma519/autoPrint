@@ -120,14 +120,17 @@ def procesar_impresion():
         
         # Crear ventana de carga
         crear_ventana_carga()
+
         
         # Obtener datos de la base de datos
         actualizar_estado("Consultando base de datos...")
+        print("casi")
         datos = obtener_datos_lote(nro_lote)
         if not datos:
             actualizar_estado("Error: No se encontró el lote en la base de datos", True)
             root.after(2000, cerrar_ventana_carga)  # Cerrar después de 2 segundos
             return
+        print(datos)
         
         cod_articulo, fecha_vencimiento = datos
         
@@ -145,12 +148,12 @@ def procesar_impresion():
         
         # Mostrar éxito
         actualizar_estado("¡Éxito! Etiquetas impresas correctamente")
-        root.after(2000, cerrar_ventana_carga)  # Cerrar después de 2 segundos
+        root.after(3000,cerrar_ventana_carga)  # Cerrar después de 2 segundos
         
     except Exception as e:
         error_msg = str(e)
-        actualizar_estado(f"Error: {error_msg}", True)
-        root.after(3000, cerrar_ventana_carga)  # Cerrar después de 3 segundos
+        messagebox.showerror("Error", error_msg)
+        cerrar_ventana_carga()  # Cerrar la ventana de carga después de mostrar el error
 
 def main():
     root = crear_interfaz()
