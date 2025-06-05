@@ -157,7 +157,7 @@ def procesar_impresiones_articulo(cod_articulo):
             )
             
             # Imprimir etiquetas
-            imprimir_etiquetas(archivo_etiqueta, cantidad)
+            imprimir_etiquetas(archivo_etiqueta, cantidad, "Grande")
         
         # Limpiar impresiones procesadas
         impresiones_cargadas[cod_articulo] = []

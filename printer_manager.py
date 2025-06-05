@@ -2,15 +2,27 @@ import os
 import platform
 import win32print
 import win32api
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
+
+# Obtener nombre de la impresora desde .env
+NOMBRE_IMPRESORA = os.getenv('NOMBRE_IMPRESORA')
 
 def configurar_impresora(tamano_papel):
-    """Configura los parámetros de la impresora por defecto"""
+    """Configura los parámetros de la impresora especificada en .env"""
     try:
-        # Obtener la impresora por defecto
-        impresora = win32print.GetDefaultPrinter()
+        # Verificar que la impresora existe
+        impresoras_disponibles = []
+        for impresora in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS):
+            impresoras_disponibles.append(impresora[2])
+        
+        if NOMBRE_IMPRESORA not in impresoras_disponibles:
+            raise Exception(f"La impresora '{NOMBRE_IMPRESORA}' especificada en .env no está disponible")
         
         # Obtener el handle de la impresora
-        handle = win32print.OpenPrinter(impresora)
+        handle = win32print.OpenPrinter(NOMBRE_IMPRESORA)
         
         # Obtener la configuración actual
         info = win32print.GetPrinter(handle, 2)
@@ -40,15 +52,26 @@ def configurar_impresora(tamano_papel):
         return False
 
 def imprimir_windows(archivo, tamano_papel):
-    """Imprime en Windows usando el comando start"""
+    """Imprime en Windows usando la impresora especificada en .env"""
     if not os.path.exists(archivo):
         raise FileNotFoundError(f"El archivo {archivo} no existe")
     try:
-        # Configurar la impresora antes de imprimir
-        configurar_impresora(tamano_papel)
+        # Guardar la impresora predeterminada actual
+        impresora_anterior = win32print.GetDefaultPrinter()
         
-        # Imprimir el archivo
-        os.startfile(archivo, 'print')
+        try:
+            # Configurar la impresora antes de imprimir
+            configurar_impresora(tamano_papel)
+            
+            # Establecer la impresora especificada como predeterminada
+            win32print.SetDefaultPrinter(NOMBRE_IMPRESORA)
+            
+            # Imprimir el archivo usando os.startfile
+            os.startfile(archivo, 'print')
+            
+        finally:
+            # Restaurar la impresora predeterminada original
+            win32print.SetDefaultPrinter(impresora_anterior)
         
     except Exception as e:
         raise Exception(f"Error al imprimir en Windows: {str(e)}")
