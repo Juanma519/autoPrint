@@ -12,6 +12,10 @@ cantidad_input = None
 ventana_carga = None
 label_estado = None
 root = None
+ventana_impresiones = None
+
+# Estructura para almacenar las impresiones cargadas
+impresiones_cargadas = {}  # {cod_articulo: [(nro_lote, cantidad, fecha_vencimiento), ...]}
 
 def crear_ventana_carga():
     """Crea una ventana de carga"""
@@ -60,12 +64,124 @@ def cerrar_ventana_carga():
         ventana_carga.destroy()
         ventana_carga = None
 
+def crear_ventana_impresiones():
+    """Crea la ventana que muestra las impresiones cargadas"""
+    global ventana_impresiones
+    ventana_impresiones = tk.Toplevel()
+    ventana_impresiones.title("Impresiones Cargadas")
+    ventana_impresiones.geometry("800x600")
+    
+    # Frame principal con scroll
+    main_frame = ttk.Frame(ventana_impresiones, padding="10")
+    main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+    
+    # Canvas y scrollbar
+    canvas = tk.Canvas(main_frame)
+    scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+    scrollable_frame = ttk.Frame(canvas)
+    
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+    
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Posicionar elementos
+    canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+    scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+    
+    # Crear una tabla para cada tipo de artículo
+    row = 0
+    for cod_articulo, impresiones in impresiones_cargadas.items():
+        # Frame para cada tipo de artículo
+        frame_articulo = ttk.LabelFrame(scrollable_frame, text=f"Artículo: {cod_articulo}", padding="10")
+        frame_articulo.grid(row=row, column=0, sticky=(tk.W, tk.E), pady=10, padx=5)
+        
+        # Crear tabla
+        columns = ("Lote", "Cantidad", "Fecha Vencimiento")
+        tree = ttk.Treeview(frame_articulo, columns=columns, show="headings", height=min(len(impresiones), 5))
+        
+        # Configurar columnas
+        for col in columns:
+            tree.heading(col, text=col)
+            tree.column(col, width=100)
+        
+        # Agregar datos
+        for impresion in impresiones:
+            tree.insert("", "end", values=impresion)
+        
+        tree.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
+        
+        # Botón para imprimir
+        btn_imprimir = ttk.Button(
+            frame_articulo, 
+            text="Imprimir Todas",
+            command=lambda ca=cod_articulo: confirmar_impresion(ca)
+        )
+        btn_imprimir.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=5)
+        
+        row += 1
+    
+    # Configurar grid
+    ventana_impresiones.columnconfigure(0, weight=1)
+    ventana_impresiones.rowconfigure(0, weight=1)
+    main_frame.columnconfigure(0, weight=1)
+    main_frame.rowconfigure(0, weight=1)
+    
+    return ventana_impresiones
+
+def confirmar_impresion(cod_articulo):
+    """Muestra diálogo de confirmación antes de imprimir"""
+    respuesta = messagebox.askyesno(
+        "Confirmar Impresión",
+        f"¿Asegúrese que está la etiqueta del tipo {cod_articulo}?"
+    )
+    if respuesta:
+        procesar_impresiones_articulo(cod_articulo)
+
+def procesar_impresiones_articulo(cod_articulo):
+    """Procesa todas las impresiones de un artículo específico"""
+    global root
+    try:
+        crear_ventana_carga()
+        actualizar_estado("Procesando impresiones...")
+        
+        for nro_lote, cantidad, fecha_vencimiento in impresiones_cargadas[cod_articulo]:
+            # Procesar etiqueta
+            archivo_etiqueta = procesar_etiqueta(
+                cod_articulo, 
+                nro_lote, 
+                fecha_vencimiento
+            )
+            
+            # Imprimir etiquetas
+            imprimir_etiquetas(archivo_etiqueta, cantidad)
+        
+        # Limpiar impresiones procesadas
+        impresiones_cargadas[cod_articulo] = []
+        
+        # Actualizar interfaz
+        actualizar_estado("¡Éxito! Todas las etiquetas fueron impresas")
+        root.after(2000, cerrar_ventana_carga)
+        
+        # Actualizar ventana de impresiones
+        if ventana_impresiones:
+            ventana_impresiones.destroy()
+            crear_ventana_impresiones()
+            
+    except Exception as e:
+        error_msg = str(e)
+        messagebox.showerror("Error", error_msg)
+        cerrar_ventana_carga()
+
 def crear_interfaz():
     """Crea y configura la interfaz gráfica"""
     global root
     root = tk.Tk()
     root.title("Sistema de Impresión de Etiquetas")
-    root.geometry("400x250")
+    root.geometry("400x300")
     
     # Configurar estilo
     style = ttk.Style()
@@ -74,7 +190,7 @@ def crear_interfaz():
     style.configure("TEntry", padding=5)
     
     # Frame principal
-    main_frame = ttk.Frame(root, padding="10")
+    main_frame = ttk.Frame(root, padding="20")
     main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
     
     # Campos de entrada
@@ -88,20 +204,27 @@ def crear_interfaz():
     cantidad_input = ttk.Entry(main_frame, width=30)
     cantidad_input.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=5)
     
-    # Botón de impresión
-    print_button = ttk.Button(main_frame, text="Imprimir Etiquetas", command=procesar_impresion)
-    print_button.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=20)
+    # Botones
+    btn_frame = ttk.Frame(main_frame)
+    btn_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=20)
+    
+    btn_cargar = ttk.Button(btn_frame, text="Cargar Impresión", command=cargar_impresion)
+    btn_cargar.grid(row=0, column=0, padx=5)
+    
+    btn_ver = ttk.Button(btn_frame, text="Ver Impresiones Cargadas", command=crear_ventana_impresiones)
+    btn_ver.grid(row=0, column=1, padx=5)
     
     # Configurar grid
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
     main_frame.columnconfigure(0, weight=1)
+    btn_frame.columnconfigure(0, weight=1)
+    btn_frame.columnconfigure(1, weight=1)
     
     return root
 
-def procesar_impresion():
-    """Procesa la impresión de etiquetas"""
-    global root
+def cargar_impresion():
+    """Carga una impresión a la lista de impresiones pendientes"""
     try:
         nro_lote = lote_input.get()
         cantidad = cantidad_input.get()
@@ -120,40 +243,35 @@ def procesar_impresion():
         
         # Crear ventana de carga
         crear_ventana_carga()
-
         
         # Obtener datos de la base de datos
         actualizar_estado("Consultando base de datos...")
-        print("casi")
         datos = obtener_datos_lote(nro_lote)
         if not datos:
             actualizar_estado("Error: No se encontró el lote en la base de datos", True)
-            root.after(2000, cerrar_ventana_carga)  # Cerrar después de 2 segundos
+            root.after(2000, cerrar_ventana_carga)
             return
-        print(datos)
         
         cod_articulo, fecha_vencimiento = datos
         
-        # Procesar etiqueta
-        actualizar_estado("Procesando etiqueta...")
-        archivo_etiqueta = procesar_etiqueta(
-            cod_articulo, 
-            nro_lote, 
-            fecha_vencimiento
-        )
+        # Agregar a la lista de impresiones cargadas
+        if cod_articulo not in impresiones_cargadas:
+            impresiones_cargadas[cod_articulo] = []
         
-        # Imprimir etiquetas
-        actualizar_estado("Imprimiendo etiquetas...")
-        imprimir_etiquetas(archivo_etiqueta, cantidad)
+        impresiones_cargadas[cod_articulo].append((nro_lote, cantidad, fecha_vencimiento))
+        
+        # Limpiar campos
+        lote_input.delete(0, tk.END)
+        cantidad_input.delete(0, tk.END)
         
         # Mostrar éxito
-        actualizar_estado("¡Éxito! Etiquetas impresas correctamente")
-        root.after(3000,cerrar_ventana_carga)  # Cerrar después de 2 segundos
+        actualizar_estado("¡Éxito! Impresión cargada correctamente")
+        root.after(2000, cerrar_ventana_carga)
         
     except Exception as e:
         error_msg = str(e)
         messagebox.showerror("Error", error_msg)
-        cerrar_ventana_carga()  # Cerrar la ventana de carga después de mostrar el error
+        cerrar_ventana_carga()
 
 def main():
     root = crear_interfaz()
