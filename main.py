@@ -15,7 +15,7 @@ root = None
 ventana_impresiones = None
 
 # Estructura para almacenar las impresiones cargadas
-impresiones_cargadas = {}  # {cod_articulo: [(nro_lote, cantidad, fecha_vencimiento), ...]}
+impresiones_cargadas = []  # Lista de tuplas (cod_articulo, nro_lote, cantidad, fecha_vencimiento, tipo_etiqueta)
 
 def crear_ventana_carga():
     """Crea una ventana de carga"""
@@ -92,37 +92,40 @@ def crear_ventana_impresiones():
     canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
     scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
     
-    # Crear una tabla para cada tipo de artículo
+    # Ordenar impresiones por tipo_etiqueta
+    impresiones_ordenadas = sorted(impresiones_cargadas, key=lambda x: x[4])  # x[4] es tipo_etiqueta
+    
+    # Crear una lista para cada tipo de etiqueta
     row = 0
-    for cod_articulo, impresiones in impresiones_cargadas.items():
-        # Frame para cada tipo de artículo
-        frame_articulo = ttk.LabelFrame(scrollable_frame, text=f"Artículo: {cod_articulo}", padding="10")
-        frame_articulo.grid(row=row, column=0, sticky=(tk.W, tk.E), pady=10, padx=5)
+    tipo_etiqueta_actual = None
+    frame_actual = None
+    
+    for impresion in impresiones_ordenadas:
+        cod_articulo, nro_lote, cantidad, fecha_vencimiento, tipo_etiqueta = impresion
         
-        # Crear tabla
-        columns = ("Lote", "Cantidad", "Fecha Vencimiento")
-        tree = ttk.Treeview(frame_articulo, columns=columns, show="headings", height=min(len(impresiones), 5))
+        # Si es un nuevo tipo de etiqueta, crear nuevo frame
+        if tipo_etiqueta != tipo_etiqueta_actual:
+            tipo_etiqueta_actual = tipo_etiqueta
+            frame_actual = ttk.LabelFrame(scrollable_frame, text=f"Tipo de Etiqueta: {tipo_etiqueta}", padding="10")
+            frame_actual.grid(row=row, column=0, sticky=(tk.W, tk.E), pady=10, padx=5)
+            row += 1
         
-        # Configurar columnas
-        for col in columns:
-            tree.heading(col, text=col)
-            tree.column(col, width=100)
+        # Crear frame para cada impresión
+        frame_impresion = ttk.Frame(frame_actual)
+        frame_impresion.grid(row=len(frame_actual.winfo_children()), column=0, sticky=(tk.W, tk.E), pady=2)
         
-        # Agregar datos
-        for impresion in impresiones:
-            tree.insert("", "end", values=impresion)
-        
-        tree.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
+        # Información de la impresión
+        info_text = f"Artículo: {cod_articulo} | Lote: {nro_lote} | Cantidad: {cantidad} | Vencimiento: {fecha_vencimiento}"
+        ttk.Label(frame_impresion, text=info_text).grid(row=0, column=0, sticky=tk.W)
         
         # Botón para imprimir
         btn_imprimir = ttk.Button(
-            frame_articulo, 
-            text="Imprimir Todas",
-            command=lambda ca=cod_articulo: confirmar_impresion(ca)
+            frame_impresion,
+            text="Imprimir",
+            command=lambda ca=cod_articulo, nl=nro_lote, c=cantidad, fv=fecha_vencimiento, te=tipo_etiqueta: 
+                confirmar_impresion_individual(ca, nl, c, fv, te)
         )
-        btn_imprimir.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=5)
-        
-        row += 1
+        btn_imprimir.grid(row=0, column=1, padx=5)
     
     # Configurar grid
     ventana_impresiones.columnconfigure(0, weight=1)
@@ -132,38 +135,44 @@ def crear_ventana_impresiones():
     
     return ventana_impresiones
 
-def confirmar_impresion(cod_articulo):
-    """Muestra diálogo de confirmación antes de imprimir"""
+def confirmar_impresion_individual(cod_articulo, nro_lote, cantidad, fecha_vencimiento,tipo_etiqueta):
+    """Muestra diálogo de confirmación antes de imprimir una etiqueta individual"""
     respuesta = messagebox.askyesno(
         "Confirmar Impresión",
-        f"¿Asegúrese que está la etiqueta del tipo {cod_articulo}?"
+        f"¿Desea imprimir la etiqueta del artículo {cod_articulo}, lote {nro_lote}?",
+        f"Revise si el tamaño de la etiqueta es el correcto: {tipo_etiqueta}"
     )
     if respuesta:
-        procesar_impresiones_articulo(cod_articulo)
+        procesar_impresion_individual(cod_articulo, nro_lote, cantidad, fecha_vencimiento,tipo_etiqueta)
 
-def procesar_impresiones_articulo(cod_articulo):
-    """Procesa todas las impresiones de un artículo específico"""
+def procesar_impresion_individual(cod_articulo, nro_lote, cantidad, fecha_vencimiento,tipo_etiqueta:str):
+    """Procesa una impresión individual"""
     global root
     try:
         crear_ventana_carga()
-        actualizar_estado("Procesando impresiones...")
+        actualizar_estado("Procesando impresión...")
         
-        for nro_lote, cantidad, fecha_vencimiento in impresiones_cargadas[cod_articulo]:
-            # Procesar etiqueta
-            archivo_etiqueta = procesar_etiqueta(
-                cod_articulo, 
-                nro_lote, 
-                fecha_vencimiento
-            )
-            
+        # Procesar etiqueta usando el nro_lote proporcionado
+        archivo_etiqueta = procesar_etiqueta(
+            cod_articulo, 
+            nro_lote, 
+            fecha_vencimiento
+        )
+        if "Grande" or "grande" in tipo_etiqueta:
             # Imprimir etiquetas
             imprimir_etiquetas(archivo_etiqueta, cantidad, "Grande")
+        elif "Chico" or "chico" in tipo_etiqueta:
+            # Imprimir etiquetas
+            imprimir_etiquetas(archivo_etiqueta, cantidad, "Chico")
+        else:
+            raise Exception(f"Tipo de etiqueta no válido: {tipo_etiqueta}")
         
-        # Limpiar impresiones procesadas
-        impresiones_cargadas[cod_articulo] = []
+        # Eliminar la impresión de la lista
+        impresiones_cargadas[:] = [imp for imp in impresiones_cargadas 
+                                 if not (imp[0] == cod_articulo and imp[1] == nro_lote)]
         
         # Actualizar interfaz
-        actualizar_estado("¡Éxito! Todas las etiquetas fueron impresas")
+        actualizar_estado("¡Éxito! La etiqueta fue impresa")
         root.after(2000, cerrar_ventana_carga)
         
         # Actualizar ventana de impresiones
@@ -252,13 +261,12 @@ def cargar_impresion():
             root.after(2000, cerrar_ventana_carga)
             return
         
-        cod_articulo, fecha_vencimiento = datos
+        cod_articulo, fecha_vencimiento, tipo_etiqueta = datos
+        tipo_etiqueta = tipo_etiqueta.upper()
+      
         
         # Agregar a la lista de impresiones cargadas
-        if cod_articulo not in impresiones_cargadas:
-            impresiones_cargadas[cod_articulo] = []
-        
-        impresiones_cargadas[cod_articulo].append((nro_lote, cantidad, fecha_vencimiento))
+        impresiones_cargadas.append((cod_articulo, nro_lote, cantidad, fecha_vencimiento, tipo_etiqueta))
         
         # Limpiar campos
         lote_input.delete(0, tk.END)

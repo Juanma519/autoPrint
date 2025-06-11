@@ -33,14 +33,14 @@ def obtener_datos_lote(nro_lote):
         
         # Ajusta esta consulta según tu esquema de base de datos
         query = """
-            SELECT cod_articulo, fec_venc
+            SELECT cod_articulo, fec_venc, tipo_etiqueta
             FROM v_cz_articulolote 
             WHERE nro_lote = ?
         """
         cursor.execute(query, (str(nro_lote),))
         resultado = cursor.fetchone()
         if resultado:
-            return resultado[0], formatear_fecha(resultado[1])
+            return resultado[0], formatear_fecha(resultado[1]), resultado[2]
         return None
 
     except Exception as e:
