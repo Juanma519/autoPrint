@@ -67,9 +67,17 @@ def cerrar_ventana_carga():
 def crear_ventana_impresiones():
     """Crea la ventana que muestra las impresiones cargadas"""
     global ventana_impresiones
+    
+    # Si ya existe una ventana, la destruimos
+    if ventana_impresiones:
+        ventana_impresiones.destroy()
+    
     ventana_impresiones = tk.Toplevel()
     ventana_impresiones.title("Impresiones Cargadas")
     ventana_impresiones.geometry("800x600")
+    
+    # Configurar el evento de cierre de ventana
+    ventana_impresiones.protocol("WM_DELETE_WINDOW", lambda: cerrar_ventana_impresiones())
     
     # Frame principal con scroll
     main_frame = ttk.Frame(ventana_impresiones, padding="10")
@@ -135,13 +143,17 @@ def crear_ventana_impresiones():
     
     return ventana_impresiones
 
+def cerrar_ventana_impresiones():
+    """Cierra la ventana de impresiones cargadas"""
+    global ventana_impresiones
+    if ventana_impresiones:
+        ventana_impresiones.destroy()
+        ventana_impresiones = None
+
 def confirmar_impresion_individual(cod_articulo, nro_lote, cantidad, fecha_vencimiento,tipo_etiqueta):
     """Muestra diálogo de confirmación antes de imprimir una etiqueta individual"""
-    respuesta = messagebox.askyesno(
-        "Confirmar Impresión",
-        f"¿Desea imprimir la etiqueta del artículo {cod_articulo}, lote {nro_lote}?",
-        f"Revise si el tamaño de la etiqueta es el correcto: {tipo_etiqueta}"
-    )
+    mensaje = f"¿Desea imprimir la etiqueta del artículo {cod_articulo}, lote {nro_lote} con cantidad {cantidad}? \nRevise si la etiqueta en la impresora es {tipo_etiqueta}"
+    respuesta = messagebox.askyesno("Confirmar Impresión", mensaje)
     if respuesta:
         procesar_impresion_individual(cod_articulo, nro_lote, cantidad, fecha_vencimiento,tipo_etiqueta)
 
@@ -155,13 +167,14 @@ def procesar_impresion_individual(cod_articulo, nro_lote, cantidad, fecha_vencim
         # Procesar etiqueta usando el nro_lote proporcionado
         archivo_etiqueta = procesar_etiqueta(
             cod_articulo, 
-            nro_lote, 
+            nro_lote,
             fecha_vencimiento
         )
-        if "Grande" or "grande" in tipo_etiqueta:
+        
+        if "Grande" in tipo_etiqueta or "grande" in tipo_etiqueta:
             # Imprimir etiquetas
             imprimir_etiquetas(archivo_etiqueta, cantidad, "Grande")
-        elif "Chico" or "chico" in tipo_etiqueta:
+        elif "Chico" in tipo_etiqueta or "chico" in tipo_etiqueta:
             # Imprimir etiquetas
             imprimir_etiquetas(archivo_etiqueta, cantidad, "Chico")
         else:
@@ -175,10 +188,13 @@ def procesar_impresion_individual(cod_articulo, nro_lote, cantidad, fecha_vencim
         actualizar_estado("¡Éxito! La etiqueta fue impresa")
         root.after(2000, cerrar_ventana_carga)
         
-        # Actualizar ventana de impresiones
+        # Actualizar ventana de impresiones si está abierta
         if ventana_impresiones:
-            ventana_impresiones.destroy()
-            crear_ventana_impresiones()
+            # Si no quedan impresiones, cerrar la ventana
+            if not impresiones_cargadas:
+                cerrar_ventana_impresiones()
+            else:
+                crear_ventana_impresiones()
             
     except Exception as e:
         error_msg = str(e)
@@ -263,7 +279,6 @@ def cargar_impresion():
         
         cod_articulo, fecha_vencimiento, tipo_etiqueta = datos
         tipo_etiqueta = tipo_etiqueta.upper()
-      
         
         # Agregar a la lista de impresiones cargadas
         impresiones_cargadas.append((cod_articulo, nro_lote, cantidad, fecha_vencimiento, tipo_etiqueta))
@@ -275,6 +290,10 @@ def cargar_impresion():
         # Mostrar éxito
         actualizar_estado("¡Éxito! Impresión cargada correctamente")
         root.after(2000, cerrar_ventana_carga)
+        
+        # Actualizar ventana de impresiones si está abierta
+        if ventana_impresiones:
+            crear_ventana_impresiones()
         
     except Exception as e:
         error_msg = str(e)

@@ -33,7 +33,7 @@ def obtener_datos_lote(nro_lote):
         
         # Ajusta esta consulta según tu esquema de base de datos
         query = """
-            SELECT cod_articulo, fec_venc, tipo_etiqueta
+            SELECT cod_articulo, fec_venc, NombreEtiqueta
             FROM v_cz_articulolote 
             WHERE nro_lote = ?
         """
