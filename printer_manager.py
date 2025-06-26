@@ -16,14 +16,16 @@ def configurar_impresora(tamano_papel):
     Ajusta ancho, largo y orientación en la impresora definida en .env
     y verifica que el driver acepte el cambio.
     """
-    handle = win32print.OpenPrinter(NOMBRE_IMPRESORA)
+    
+    handle = win32print.OpenPrinter(NOMBRE_IMPRESORA, {"DesiredAccess": win32print.PRINTER_ALL_ACCESS}  # <─ clave
+)
     try:
         info = win32print.GetPrinter(handle, 2)
         dm = info['pDevMode']          # alias breve
 
         # --- 1. Elegir valores según tamaño ---
         if tamano_papel == "Grande":
-            width, length = 1500, 1800   # 150 mm × 180 mm
+            width, length = 1500, 2100   # 150 mm × 210 mm
         elif tamano_papel == "Chico":
             width, length = 1100, 1800   # 110 mm × 180 mm
         else:
@@ -53,7 +55,7 @@ def configurar_impresora(tamano_papel):
 
         # --- 5. Guardar como Preferencias de impresora ---
         info['pDevMode'] = dm
-        win32print.SetPrinter(handle, 2, info, 0)
+        win32print.SetPrinter(handle, 2, info, 0)   # <-- esto faltaba
 
     finally:
         win32print.ClosePrinter(handle)
