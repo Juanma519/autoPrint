@@ -3,7 +3,7 @@ import platform
 import win32print
 import win32api
 from dotenv import load_dotenv
-
+import win32con
 # Cargar variables de entorno
 load_dotenv()
 
@@ -33,13 +33,13 @@ def configurar_impresora(tamano_papel):
         dm.PaperSize   = 256            # DM_PAPER_USER → tamaño personalizado
         dm.PaperWidth  = width          # décimas de mm
         dm.PaperLength = length
-        dm.Orientation = win32print.DMORIENT_LANDSCAPE
+        dm.Orientation = win32con.DMORIENT_LANDSCAPE
 
         # --- 3. Activar los flags para que el driver los respete ---
-        dm.Fields |= (win32print.DM_PAPERSIZE |
-                      win32print.DM_PAPERLENGTH |
-                      win32print.DM_PAPERWIDTH |
-                      win32print.DM_ORIENTATION)
+        dm.Fields |= (win32con.DM_PAPERSIZE |
+                      win32con.DM_PAPERLENGTH |
+                      win32con.DM_PAPERWIDTH |
+                      win32con.DM_ORIENTATION)
 
         # --- 4. Validar & aplicar con DocumentProperties ---
         win32print.DocumentProperties(
@@ -48,7 +48,7 @@ def configurar_impresora(tamano_papel):
             NOMBRE_IMPRESORA,
             dm,              # salida
             dm,              # entrada (misma struct)
-            win32print.DM_IN_BUFFER | win32print.DM_OUT_BUFFER
+            win32con.DM_IN_BUFFER | win32con.DM_OUT_BUFFER
         )
 
         # --- 5. Guardar como Preferencias de impresora ---
@@ -59,14 +59,7 @@ def configurar_impresora(tamano_papel):
         win32print.ClosePrinter(handle)
 
 
-def leer_config_impresora():
-    """Devuelve ancho, largo y orientación grabados en la impresora."""
-    handle = win32print.OpenPrinter(NOMBRE_IMPRESORA)
-    try:
-        dm = win32print.GetPrinter(handle, 2)['pDevMode']
-        return dm.PaperWidth, dm.PaperLength, dm.Orientation
-    finally:
-        win32print.ClosePrinter(handle)
+
 
 
 def imprimir_windows(archivo, tamano_papel):
