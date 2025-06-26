@@ -170,11 +170,12 @@ def procesar_impresion_individual(cod_articulo, nro_lote, cantidad, fecha_vencim
             nro_lote,
             fecha_vencimiento
         )
-        
-        if "Grande" in tipo_etiqueta or "grande" in tipo_etiqueta:
+        tipo_etiqueta_limpio = (tipo_etiqueta or "").strip().lower()
+
+        if "Grande" in tipo_etiqueta_limpio or "grande" in tipo_etiqueta_limpio:
             # Imprimir etiquetas
             imprimir_etiquetas(archivo_etiqueta, cantidad, "Grande")
-        elif "Chico" in tipo_etiqueta or "chico" in tipo_etiqueta:
+        elif "Chica" in tipo_etiqueta_limpio or "chica" in tipo_etiqueta_limpio:
             # Imprimir etiquetas
             imprimir_etiquetas(archivo_etiqueta, cantidad, "Chico")
         else:
