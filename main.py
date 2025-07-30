@@ -74,7 +74,7 @@ def crear_ventana_impresiones():
     
     ventana_impresiones = tk.Toplevel()
     ventana_impresiones.title("Impresiones Cargadas")
-    ventana_impresiones.geometry("800x600")
+    ventana_impresiones.geometry("900x700")
     
     # Configurar el evento de cierre de ventana
     ventana_impresiones.protocol("WM_DELETE_WINDOW", lambda: cerrar_ventana_impresiones())
@@ -108,7 +108,7 @@ def crear_ventana_impresiones():
     tipo_etiqueta_actual = None
     frame_actual = None
     
-    for impresion in impresiones_ordenadas:
+    for i, impresion in enumerate(impresiones_ordenadas):
         cod_articulo, nro_lote, cantidad, fecha_vencimiento, tipo_etiqueta = impresion
         
         # Si es un nuevo tipo de etiqueta, crear nuevo frame
@@ -120,20 +120,58 @@ def crear_ventana_impresiones():
         
         # Crear frame para cada impresión
         frame_impresion = ttk.Frame(frame_actual)
-        frame_impresion.grid(row=len(frame_actual.winfo_children()), column=0, sticky=(tk.W, tk.E), pady=2)
+        frame_impresion.grid(row=len(frame_actual.winfo_children()), column=0, sticky=(tk.W, tk.E), pady=5)
         
-        # Información de la impresión
-        info_text = f"Artículo: {cod_articulo} | Lote: {nro_lote} | Cantidad: {cantidad} | Vencimiento: {fecha_vencimiento}"
-        ttk.Label(frame_impresion, text=info_text).grid(row=0, column=0, sticky=tk.W)
+        # Información del artículo y lote (no editable)
+        ttk.Label(frame_impresion, text=f"Artículo: {cod_articulo} | Lote: {nro_lote}", 
+                 font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=2)
+        
+        # Frame para campos editables
+        campos_frame = ttk.Frame(frame_impresion)
+        campos_frame.grid(row=1, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=2)
+        
+        # Campo de cantidad
+        ttk.Label(campos_frame, text="Cantidad:").grid(row=0, column=0, sticky=tk.W, padx=5)
+        cantidad_var = tk.StringVar(value=str(cantidad))
+        entry_cantidad = ttk.Entry(campos_frame, textvariable=cantidad_var, width=10)
+        entry_cantidad.grid(row=0, column=1, padx=5)
+        
+        # Campo de fecha de vencimiento
+        ttk.Label(campos_frame, text="Fecha Venc:").grid(row=0, column=2, sticky=tk.W, padx=5)
+        fecha_var = tk.StringVar(value=fecha_vencimiento)
+        entry_fecha = ttk.Entry(campos_frame, textvariable=fecha_var, width=12)
+        entry_fecha.grid(row=0, column=3, padx=5)
+        
+        # Frame para botones
+        botones_frame = ttk.Frame(frame_impresion)
+        botones_frame.grid(row=2, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=5)
+        
+        # Botón para actualizar
+        btn_actualizar = ttk.Button(
+            botones_frame,
+            text="Actualizar",
+            command=lambda idx=i, cv=cantidad_var, fv=fecha_var, ca=cod_articulo, nl=nro_lote: 
+                actualizar_impresion(idx, cv.get(), fv.get(), ca, nl)
+        )
+        btn_actualizar.grid(row=0, column=0, padx=5)
         
         # Botón para imprimir
         btn_imprimir = ttk.Button(
-            frame_impresion,
+            botones_frame,
             text="Imprimir",
-            command=lambda ca=cod_articulo, nl=nro_lote, c=cantidad, fv=fecha_vencimiento, te=tipo_etiqueta: 
-                confirmar_impresion_individual(ca, nl, c, fv, te)
+            command=lambda ca=cod_articulo, nl=nro_lote, cv=cantidad_var, fv=fecha_var, te=tipo_etiqueta: 
+                confirmar_impresion_individual(ca, nl, cv.get(), fv.get(), te)
         )
         btn_imprimir.grid(row=0, column=1, padx=5)
+        
+        # Botón para eliminar
+        btn_eliminar = ttk.Button(
+            botones_frame,
+            text="Eliminar",
+            command=lambda ca=cod_articulo, nl=nro_lote: 
+                eliminar_impresion(ca, nl)
+        )
+        btn_eliminar.grid(row=0, column=2, padx=5)
     
     # Configurar grid
     ventana_impresiones.columnconfigure(0, weight=1)
@@ -142,6 +180,57 @@ def crear_ventana_impresiones():
     main_frame.rowconfigure(0, weight=1)
     
     return ventana_impresiones
+
+def actualizar_impresion(indice_original, nueva_cantidad, nueva_fecha, cod_articulo, nro_lote):
+    """Actualiza la cantidad y fecha de vencimiento de una impresión"""
+    try:
+        # Validar cantidad
+        try:
+            nueva_cantidad = int(nueva_cantidad)
+            if nueva_cantidad <= 0:
+                raise ValueError()
+        except ValueError:
+            messagebox.showwarning("Error", "La cantidad debe ser un número entero positivo")
+            return
+        
+        # Buscar la impresión en la lista y actualizarla
+        for i, impresion in enumerate(impresiones_cargadas):
+            if impresion[0] == cod_articulo and impresion[1] == nro_lote:
+                # Actualizar la tupla
+                impresiones_cargadas[i] = (
+                    impresion[0],  # cod_articulo
+                    impresion[1],  # nro_lote
+                    nueva_cantidad,  # cantidad actualizada
+                    nueva_fecha,  # fecha_vencimiento actualizada
+                    impresion[4]   # tipo_etiqueta
+                )
+                break
+        
+        # Actualizar la ventana
+        crear_ventana_impresiones()
+        messagebox.showinfo("Éxito", "Impresión actualizada correctamente")
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Error al actualizar: {str(e)}")
+
+def eliminar_impresion(cod_articulo, nro_lote):
+    """Elimina una impresión de la lista"""
+    respuesta = messagebox.askyesno(
+        "Confirmar Eliminación",
+        f"¿Está seguro de eliminar la impresión del artículo {cod_articulo}, lote {nro_lote}?"
+    )
+    if respuesta:
+        # Eliminar la impresión de la lista
+        impresiones_cargadas[:] = [imp for imp in impresiones_cargadas 
+                                 if not (imp[0] == cod_articulo and imp[1] == nro_lote)]
+        
+        # Actualizar ventana de impresiones
+        if ventana_impresiones:
+            # Si no quedan impresiones, cerrar la ventana
+            if not impresiones_cargadas:
+                cerrar_ventana_impresiones()
+            else:
+                crear_ventana_impresiones()
 
 def cerrar_ventana_impresiones():
     """Cierra la ventana de impresiones cargadas"""
